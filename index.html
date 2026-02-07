@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ironcrawl Tanks</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="hud">
+        <div class="hud__title">
+          <div class="hud__brand">Ironcrawl Tanks</div>
+          <div class="hud__subtitle">市街地バンカー襲撃</div>
+        </div>
+        <div class="hud__stats">
+          <div>フロア: <span id="floor">1</span></div>
+          <div>HP: <span id="hp">6</span></div>
+          <div>弾薬: <span id="ammo">8</span></div>
+          <div>スコア: <span id="score">0</span></div>
+        </div>
+        <div class="hud__actions">
+          <button id="pauseBtn" class="btn" type="button">一時停止</button>
+          <button id="restartBtn" class="btn" type="button">やり直し</button>
+        </div>
+      </header>
+
+      <section class="board-wrapper">
+        <canvas
+          id="board"
+          width="480"
+          height="480"
+          aria-label="ローグライク戦車ゲームのマップ"
+        ></canvas>
+        <div id="overlay" class="overlay" aria-live="polite"></div>
+      </section>
+
+      <section class="controls" aria-label="オンスクリーン操作">
+        <div class="controls__row">
+          <button class="btn" data-action="move-up" type="button">上</button>
+        </div>
+        <div class="controls__row">
+          <button class="btn" data-action="move-left" type="button">左</button>
+          <button class="btn" data-action="move-down" type="button">下</button>
+          <button class="btn" data-action="move-right" type="button">右</button>
+        </div>
+        <div class="controls__row controls__row--extra">
+          <button class="btn btn--accent" data-action="fire" type="button">射撃</button>
+        </div>
+      </section>
+
+      <section class="log" aria-label="戦闘ログ">
+        <div class="log__title">戦闘ログ</div>
+        <ul id="log" class="log__list"></ul>
+      </section>
+
+      <p class="hint">
+        矢印/WASDで移動。Spaceで射撃。Pで一時停止。Rでやり直し。
+      </p>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
