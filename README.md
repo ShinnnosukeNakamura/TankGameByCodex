@@ -42,6 +42,30 @@
 - `main.js`: 入口・ゲームループ
 - `gameLogic.js`: 主要ロジック
 - `SPEC.md`: 仕様メモ
+- `config.js`: ランキングAPIの設定
+- `infra/`: AWS CDK (DynamoDB + Lambda + API)
+
+## ランキングAPI設定
+`config.js` の `API_BASE_URL` に、CDKデプロイ後に出力されるAPI URLを設定してください。
+
+## AWSデプロイ（CDK）
+1. `infra/` に移動して依存関係をインストールします。
+2. 初回のみ `cdk bootstrap` を実行します。
+3. `cdk deploy` でデプロイします。
+
+例:
+```bash
+cd infra
+npm install
+npx cdk bootstrap
+npx cdk deploy -c allowedOrigin=https://<AMPLIFYのドメイン>
+```
+
+デプロイ後に `LeaderboardApiUrl` が出力されるので、`config.js` に反映します。
+
+## Amplify Hosting
+このゲームは静的サイトなので、Amplify Hosting でそのままホストできます。
+ビルドが不要な場合は、リポジトリのルートをデプロイ対象にしてください。
 
 ## ライセンス
 未設定

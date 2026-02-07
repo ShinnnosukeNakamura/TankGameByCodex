@@ -5,6 +5,11 @@ import {
   createSeededRng,
   update,
 } from "./gameLogic.js";
+import {
+  API_BASE_URL,
+  LEADERBOARD_BOARD_ID,
+  LEADERBOARD_LIMIT,
+} from "./config.js";
 
 const canvas = document.getElementById("board");
 const scoreEl = document.getElementById("score");
@@ -12,9 +17,16 @@ const floorEl = document.getElementById("floor");
 const hpEl = document.getElementById("hp");
 const ammoEl = document.getElementById("ammo");
 const overlay = document.getElementById("overlay");
+const overlayMessage = document.getElementById("overlayMessage");
+const scoreForm = document.getElementById("scoreForm");
+const playerNameInput = document.getElementById("playerName");
+const scoreStatus = document.getElementById("scoreStatus");
 const logEl = document.getElementById("log");
 const pauseBtn = document.getElementById("pauseBtn");
 const restartBtn = document.getElementById("restartBtn");
+const leaderboardList = document.getElementById("leaderboardList");
+const refreshBoardBtn = document.getElementById("refreshBoardBtn");
+const submitScoreBtn = document.getElementById("submitScoreBtn");
 
 const ctx = canvas.getContext("2d");
 const cellSize = canvas.width / GRID_SIZE;
@@ -23,6 +35,7 @@ const rng = createSeededRng(Date.now() % 100000);
 let state = createGame({ gridSize: GRID_SIZE, rng });
 let isPaused = false;
 let lastTime = 0;
+let hasSubmittedScore = false;
 
 const keys = {
   up: false,
@@ -49,6 +62,12 @@ const COLORS = {
   fog: "rgba(24, 19, 14, 0.9)",
   fogSoft: "rgba(24, 19, 14, 0.5)",
 };
+
+const API_BASE = (API_BASE_URL || "").trim();
+const BOARD_ID = (LEADERBOARD_BOARD_ID || "main").trim() || "main";
+const LEADERBOARD_SIZE = Number.isFinite(LEADERBOARD_LIMIT)
+  ? Math.max(1, Math.min(50, LEADERBOARD_LIMIT))
+  : 10;
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -193,16 +212,24 @@ function updateHud() {
 
 function updateOverlay() {
   if (state.isGameOver) {
-    overlay.textContent = "戦車が大破しました。Restartで再挑戦。";
+    overlayMessage.textContent = hasSubmittedScore
+      ? "戦車が大破しました。スコアを登録しました。Restartで再挑戦。"
+      : "戦車が大破しました。スコアを登録してからRestartで再挑戦。";
     overlay.classList.add("is-visible");
+    overlay.classList.add("is-gameover");
+    if (!hasSubmittedScore && playerNameInput) {
+      playerNameInput.focus();
+    }
     return;
   }
   if (isPaused) {
-    overlay.textContent = "一時停止";
+    overlayMessage.textContent = "一時停止";
     overlay.classList.add("is-visible");
+    overlay.classList.remove("is-gameover");
     return;
   }
   overlay.classList.remove("is-visible");
+  overlay.classList.remove("is-gameover");
 }
 
 function render() {
@@ -292,12 +319,160 @@ function restart() {
   state = createGame({ gridSize: GRID_SIZE, rng });
   isPaused = false;
   pauseBtn.textContent = "一時停止";
+  resetScoreSubmission();
+}
+
+function resetScoreSubmission() {
+  hasSubmittedScore = false;
+  if (scoreForm) scoreForm.reset();
+  setScoreStatus("");
+  if (submitScoreBtn) submitScoreBtn.disabled = false;
+}
+
+function setScoreStatus(message, kind = "") {
+  if (!scoreStatus) return;
+  scoreStatus.textContent = message;
+  scoreStatus.className = "score-form__status";
+  if (kind) scoreStatus.classList.add(`is-${kind}`);
+}
+
+function buildApiUrl(path) {
+  if (!API_BASE) return path;
+  return API_BASE.endsWith("/") ? `${API_BASE.slice(0, -1)}${path}` : `${API_BASE}${path}`;
+}
+
+function setLeaderboardMessage(message) {
+  if (!leaderboardList) return;
+  leaderboardList.innerHTML = "";
+  const item = document.createElement("li");
+  item.className = "leaderboard__item";
+  const rank = document.createElement("span");
+  rank.className = "leaderboard__rank";
+  rank.textContent = "-";
+  const name = document.createElement("span");
+  name.className = "leaderboard__name";
+  name.textContent = message;
+  const score = document.createElement("span");
+  score.className = "leaderboard__score";
+  score.textContent = "";
+  item.appendChild(rank);
+  item.appendChild(name);
+  item.appendChild(score);
+  leaderboardList.appendChild(item);
+}
+
+async function loadLeaderboard() {
+  if (!API_BASE) {
+    setLeaderboardMessage("API未設定");
+    if (refreshBoardBtn) refreshBoardBtn.disabled = true;
+    return;
+  }
+
+  try {
+    if (refreshBoardBtn) refreshBoardBtn.disabled = true;
+    const url = buildApiUrl(
+      `/leaderboard?limit=${LEADERBOARD_SIZE}&boardId=${encodeURIComponent(BOARD_ID)}`
+    );
+    const res = await fetch(url, { method: "GET" });
+    if (!res.ok) {
+      throw new Error(`Leaderboard load failed (${res.status})`);
+    }
+    const data = await res.json();
+    renderLeaderboard(Array.isArray(data.items) ? data.items : []);
+  } catch (error) {
+    console.error(error);
+    setLeaderboardMessage("読み込みに失敗しました");
+  } finally {
+    if (refreshBoardBtn) refreshBoardBtn.disabled = false;
+  }
+}
+
+function renderLeaderboard(items) {
+  if (!leaderboardList) return;
+  leaderboardList.innerHTML = "";
+  if (!items.length) {
+    setLeaderboardMessage("まだ記録がありません");
+    return;
+  }
+
+  items.forEach((item, index) => {
+    const entry = document.createElement("li");
+    entry.className = "leaderboard__item";
+
+    const rank = document.createElement("span");
+    rank.className = "leaderboard__rank";
+    rank.textContent = String(index + 1);
+
+    const name = document.createElement("span");
+    name.className = "leaderboard__name";
+    name.textContent = item.name || "名無し";
+
+    const score = document.createElement("span");
+    score.className = "leaderboard__score";
+    const floorLabel = Number.isFinite(item.floor) ? ` / F${item.floor}` : "";
+    score.textContent = `${item.score ?? 0}${floorLabel}`;
+
+    entry.appendChild(rank);
+    entry.appendChild(name);
+    entry.appendChild(score);
+    leaderboardList.appendChild(entry);
+  });
+}
+
+async function handleScoreSubmit(event) {
+  event.preventDefault();
+  if (!API_BASE) {
+    setScoreStatus("API未設定のため登録できません。", "error");
+    return;
+  }
+  if (hasSubmittedScore) {
+    setScoreStatus("このプレイは登録済みです。");
+    return;
+  }
+  const rawName = playerNameInput?.value ?? "";
+  const trimmed = rawName.trim();
+  if (!trimmed) {
+    setScoreStatus("名前を入力してください。", "error");
+    return;
+  }
+
+  const payload = {
+    name: trimmed.slice(0, 8),
+    score: state.score,
+    floor: state.floor,
+    boardId: BOARD_ID,
+  };
+
+  try {
+    if (submitScoreBtn) submitScoreBtn.disabled = true;
+    setScoreStatus("送信中...", "");
+    const res = await fetch(buildApiUrl("/leaderboard"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      throw new Error(`Score submit failed (${res.status})`);
+    }
+    hasSubmittedScore = true;
+    if (submitScoreBtn) submitScoreBtn.disabled = true;
+    setScoreStatus("登録しました。", "success");
+    await loadLeaderboard();
+  } catch (error) {
+    console.error(error);
+    if (submitScoreBtn) submitScoreBtn.disabled = false;
+    setScoreStatus("登録に失敗しました。", "error");
+  }
 }
 
 pauseBtn.addEventListener("click", togglePause);
 restartBtn.addEventListener("click", restart);
 window.addEventListener("keydown", handleKeyDown);
 window.addEventListener("keyup", handleKeyUp);
+if (scoreForm) scoreForm.addEventListener("submit", handleScoreSubmit);
+if (refreshBoardBtn) refreshBoardBtn.addEventListener("click", loadLeaderboard);
 
 const actionButtons = Array.from(document.querySelectorAll("[data-action]"));
 actionButtons.forEach((btn) => {
@@ -327,4 +502,6 @@ actionButtons.forEach((btn) => {
 });
 
 render();
+resetScoreSubmission();
+loadLeaderboard();
 window.requestAnimationFrame(gameLoop);

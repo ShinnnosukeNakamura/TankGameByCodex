@@ -32,7 +32,28 @@
           height="480"
           aria-label="ローグライク戦車ゲームのマップ"
         ></canvas>
-        <div id="overlay" class="overlay" aria-live="polite"></div>
+        <div id="overlay" class="overlay" aria-live="polite" aria-atomic="true">
+          <div class="overlay__panel">
+            <p id="overlayMessage" class="overlay__message"></p>
+            <form id="scoreForm" class="score-form" autocomplete="off" novalidate>
+              <label class="score-form__label" for="playerName">名前 (最大8文字)</label>
+              <div class="score-form__row">
+                <input
+                  id="playerName"
+                  name="playerName"
+                  type="text"
+                  maxlength="8"
+                  inputmode="text"
+                  placeholder="ACE"
+                />
+                <button id="submitScoreBtn" class="btn btn--accent" type="submit">
+                  登録
+                </button>
+              </div>
+              <div id="scoreStatus" class="score-form__status" role="status"></div>
+            </form>
+          </div>
+        </div>
       </section>
 
       <section class="controls" aria-label="オンスクリーン操作">
@@ -47,6 +68,16 @@
         <div class="controls__row controls__row--extra">
           <button class="btn btn--accent" data-action="fire" type="button">射撃</button>
         </div>
+      </section>
+
+      <section class="leaderboard" aria-label="ランキング">
+        <div class="leaderboard__header">
+          <div class="leaderboard__title">ランキング</div>
+          <button id="refreshBoardBtn" class="btn btn--ghost" type="button">
+            更新
+          </button>
+        </div>
+        <ol id="leaderboardList" class="leaderboard__list"></ol>
       </section>
 
       <section class="log" aria-label="戦闘ログ">
